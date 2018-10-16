@@ -64,6 +64,9 @@ char m_summary_string2[64];
 extern const nrf_lcd_t nrf_lcd_ili9341;
 static const nrf_lcd_t * p_lcd = &nrf_lcd_ili9341;
 
+#define DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY 1
+#define DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH 10 /* bytes */
+
 // @note: The BLE DTM 2-wire UART standard specifies 8 data bits, 1 stop bit, no flow control.
 //        These parameters are not configurable in the BLE standard.
 
@@ -106,7 +109,6 @@ void uart_error_handle(app_uart_evt_t * p_event)
 }
 
 
-#if (GUI == 0)
 /**@brief Function for UART initialization.
  */
 static void uart_init(void)
@@ -132,7 +134,7 @@ static void uart_init(void)
 
     APP_ERROR_CHECK(err_code);
 }
-#endif
+
 
 /**@brief Function for splitting UART command bit fields into separate command parameters for the DTM library.
  *
@@ -149,34 +151,101 @@ static uint32_t dtm_cmd_put(uint16_t command)
     return dtm_cmd(command_code, freq, length, payload);
 }
 
+/*
+static uint32_t dtm_tx_run_single_channel_test(dtm_cmd_t cmd, dtm_freq_t freq, uint32_t length, dtm_pkt_type_t payload)
+{
+    uint32_t ret_code;
+    dtm_event_t result;
+    bool ret;
 
+    ret_code = dtm_cmd(LE_TEST_SETUP, 0, 0, DTM_PKT_PRBS9);
+    if (ret_code != DTM_SUCCESS)
+      return ret_code;
+    ret = dtm_event_get(&result);
+    ret_code = dtm_cmd(cmd, freq, length, payload);
+    if (ret_code != DTM_SUCCESS)
+      return ret_code;
+    ret = dtm_event_get(&result);
+    return DTM_SUCCESS;
+}
+
+static uint32_t dtm_rx_run_single_channel_test(dtm_cmd_t cmd, dtm_freq_t freq, uint32_t length, dtm_pkt_type_t payload)
+{
+    uint32_t ret_code;
+    dtm_event_t result;
+    bool ret;
+
+    ret_code = dtm_cmd(LE_TEST_SETUP, 0, 0, DTM_PKT_PRBS9);
+    if (ret_code != DTM_SUCCESS)
+      return ret_code; 
+    ret = dtm_event_get(&result);
+    ret_code = dtm_cmd(cmd, freq, length, payload);
+    if (ret_code != DTM_SUCCESS)
+      return ret_code;
+    ret = dtm_event_get(&result);
+    return DTM_SUCCESS;
+}
+*/
+
+static uint32_t dtm_send_command_to_fifo(dtm_cmd_t cmd, dtm_freq_t freq, uint32_t length, dtm_pkt_type_t payload)
+{
+    uint32_t data1 = 0;
+    uint32_t data2 = 0;
+    uint32_t command = 0;
+
+    data1 = data1 + (cmd << 6);
+    data2 = (data2 << 2) + payload;
+    //self._debug("1: %s %s %s 2: %s %s %s" % (data1, bin(data1), chr(data1), data2, bin(data2), chr(data2)))
+    //command = chr(data1) + chr(data2)
+    command = data1 + data2;
+    app_uart_put((uint8_t)((command & 0x000000FF) >>  0));
+    app_uart_put((uint8_t)((command & 0x0000FF00) >>  8));
+    app_uart_put((uint8_t)((command & 0x00FF0000) >> 16));
+    app_uart_put((uint8_t)((command & 0xFF000000) >> 24));
+}
 
 void window_1_callback ( UG_MESSAGE* msg )
 {
     static bool BTN_ID_0_tx = true;
 
     if ( msg->type == MSG_TYPE_OBJECT ) {
-        if (msg->id == OBJ_TYPE_BUTTON) {
-            if ((msg->event != OBJ_EVENT_PRERENDER) && (msg->event != OBJ_EVENT_POSTRENDER && (msg->event == OBJ_EVENT_RELEASED))) {
-                switch( msg->sub_id ) {
-                    case BTN_ID_0 :
-                    {   
-                        BTN_ID_0_tx = !BTN_ID_0_tx;
-                        if (!BTN_ID_0_tx)
-                            UG_ButtonSetText(&window_1, BTN_ID_0, "RX"); 
-                        else
-                            UG_ButtonSetText(&window_1, BTN_ID_0, "TX"); 
-                        break ;
-                    }                         
-                    default :
-                    {
-                        // . . .
-                        break ;
-                    }
-                }                
+      if (msg->id == OBJ_TYPE_BUTTON) {
+        if ((msg->event != OBJ_EVENT_PRERENDER) && (msg->event != OBJ_EVENT_POSTRENDER && (msg->event == OBJ_EVENT_RELEASED))) {
+          switch( msg->sub_id ) {
+            case BTN_ID_0 : {   
+              BTN_ID_0_tx = !BTN_ID_0_tx;
+              if (!BTN_ID_0_tx) {
+                UG_ButtonSetText(&window_1, BTN_ID_0, "RX");                
+                UG_ButtonSetText(&window_1, BTN_ID_1, "Start RX"); 
+                UG_ButtonHide(&window_1, BTN_ID_2);
+                UG_TextboxSetText(&window_1 , TXB_ID_1 , "Select RX Test:") ;
+              }
+              else {
+                UG_ButtonSetText(&window_1, BTN_ID_0, "TX"); 
+                UG_ButtonSetText(&window_1, BTN_ID_1, "TX 1-channel Test");                 
+                UG_ButtonShow(&window_1, BTN_ID_2);
+                UG_TextboxSetText(&window_1 , TXB_ID_1 , "Select TX Test:") ;
+              }
+              break ;
             }
+            case BTN_ID_1 : {             
+              if (BTN_ID_0_tx) {
+                (void)dtm_send_command_to_fifo(LE_TRANSMITTER_TEST, DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY, DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH, DTM_PKT_PRBS9);                
+              }
+              else {
+                (void)dtm_send_command_to_fifo(LE_RECEIVER_TEST, DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY, DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH, DTM_PKT_PRBS9);                
+              }
+              break;
+            }
+            default :
+            {
+                // . . .
+                break ;
+            }
+         } 
        }
-   }
+     }
+    }
 }
 
 
@@ -184,7 +253,10 @@ UG_GUI gui;
 #define MAX_OBJECTS 10
 UG_OBJECT obj_buff_wnd_1[MAX_OBJECTS];
 UG_TEXTBOX textbox_select_role;
-UG_BUTTON role_button;
+UG_TEXTBOX textbox_select_tx_test;
+UG_BUTTON button_role;
+UG_BUTTON button_tx_one_chan_test;
+UG_BUTTON button_tx_many_chan_test;
 
 /**@brief Function for application main entry.
  *
@@ -203,9 +275,9 @@ int main(void)
     dtm_event_t result;                    // Result of a DTM operation.
 
     bsp_board_init(BSP_INIT_LEDS);
-#if (GUI == 0)  
+
     uart_init();
-#endif
+
     dtm_error_code = dtm_init();
     if (dtm_error_code != DTM_SUCCESS)
     {
@@ -223,9 +295,24 @@ int main(void)
 #define INTERWIDGET_SPACE 10
 
 #define BTN_ID_0_X_LOCATION TXT_ID_0_X_LOCATION
-#define BTN_ID_0_Y_LOCATION TXT_ID_0_Y_LOCATION+TXT_ID_0_HEIGHT+INTERWIDGET_SPACE
+#define BTN_ID_0_Y_LOCATION TXT_ID_0_Y_LOCATION+TXT_ID_0_HEIGHT+INTERWIDGET_SPACE-5
 #define BTN_ID_0_WIDTH TXT_ID_0_WIDTH
 #define BTN_ID_0_HEIGHT 30
+
+#define TXT_ID_1_X_LOCATION TXT_ID_0_X_LOCATION
+#define TXT_ID_1_Y_LOCATION BTN_ID_0_Y_LOCATION+BTN_ID_0_HEIGHT+INTERWIDGET_SPACE*2
+#define TXT_ID_1_WIDTH TXT_ID_0_WIDTH
+#define TXT_ID_1_HEIGHT TXT_ID_0_HEIGHT
+
+#define BTN_ID_1_X_LOCATION TXT_ID_1_X_LOCATION
+#define BTN_ID_1_Y_LOCATION TXT_ID_1_Y_LOCATION+TXT_ID_1_HEIGHT+INTERWIDGET_SPACE-5
+#define BTN_ID_1_WIDTH TXT_ID_1_WIDTH
+#define BTN_ID_1_HEIGHT BTN_ID_0_HEIGHT
+
+#define BTN_ID_2_X_LOCATION BTN_ID_1_X_LOCATION
+#define BTN_ID_2_Y_LOCATION BTN_ID_1_Y_LOCATION+BTN_ID_1_HEIGHT+INTERWIDGET_SPACE-5
+#define BTN_ID_2_WIDTH BTN_ID_1_WIDTH
+#define BTN_ID_2_HEIGHT BTN_ID_1_HEIGHT
 
     UG_Init(&gui, 240, 320, p_lcd);
 
@@ -236,7 +323,7 @@ int main(void)
     UG_WindowSetTitleTextFont (&window_1 , &FONT_10X16) ;
     UG_WindowSetTitleTextAlignment(&window_1, ALIGN_CENTER);
 
-     /* Create "Select role" textbox (TXB_ID_0) */
+    /* Create "Select role" textbox (TXB_ID_0) */
     UG_TextboxCreate(&window_1, &textbox_select_role, TXB_ID_0, TXT_ID_0_X_LOCATION, TXT_ID_0_Y_LOCATION, TXT_ID_0_X_LOCATION+TXT_ID_0_WIDTH, TXT_ID_0_Y_LOCATION+TXT_ID_0_HEIGHT);  
     UG_TextboxSetFont(&window_1, TXB_ID_0, &FONT_8X12);
     UG_TextboxSetText(&window_1 , TXB_ID_0 , "Select role:") ;
@@ -245,33 +332,51 @@ int main(void)
     UG_TextboxSetAlignment (&window_1 , TXB_ID_0 , ALIGN_CENTER );
 
     /* Create "Role" selection button (BTN_ID_0) */
-    UG_ButtonCreate(&window_1, &role_button, BTN_ID_0, BTN_ID_0_X_LOCATION, BTN_ID_0_Y_LOCATION, BTN_ID_0_X_LOCATION+BTN_ID_0_WIDTH, BTN_ID_0_Y_LOCATION+BTN_ID_0_HEIGHT);
+    UG_ButtonCreate(&window_1, &button_role, BTN_ID_0, BTN_ID_0_X_LOCATION, BTN_ID_0_Y_LOCATION, BTN_ID_0_X_LOCATION+BTN_ID_0_WIDTH, BTN_ID_0_Y_LOCATION+BTN_ID_0_HEIGHT);
     UG_ButtonSetStyle(&window_1, BTN_ID_0, BTN_STYLE_3D|BTN_STYLE_USE_ALTERNATE_COLORS);
     UG_ButtonSetForeColor(&window_1, BTN_ID_0, C_YELLOW);
     UG_ButtonSetBackColor(&window_1, BTN_ID_0, C_MEDIUM_BLUE);  
     UG_ButtonSetFont(&window_1, BTN_ID_0, &FONT_10X16);
     UG_ButtonSetText(&window_1, BTN_ID_0, "TX");    
 
+    /* Create "Select TX test" textbox (TXB_ID_1) */
+    UG_TextboxCreate(&window_1, &textbox_select_tx_test, TXB_ID_1, TXT_ID_1_X_LOCATION, TXT_ID_1_Y_LOCATION, TXT_ID_1_X_LOCATION+TXT_ID_1_WIDTH, TXT_ID_1_Y_LOCATION+TXT_ID_1_HEIGHT);  
+    UG_TextboxSetFont(&window_1, TXB_ID_1, &FONT_8X12);
+    UG_TextboxSetText(&window_1 , TXB_ID_1 , "Select TX Test:") ;
+    UG_TextboxSetForeColor (&window_1 , TXB_ID_1 , C_MAROON ) ;
+    UG_TextboxSetBackColor (&window_1 , TXB_ID_1 , C_DODGER_BLUE ); 
+    UG_TextboxSetAlignment (&window_1 , TXB_ID_1 , ALIGN_CENTER );
+
+    /* Create "1 channel TX test" selection button (BTN_ID_1) */
+    UG_ButtonCreate(&window_1, &button_tx_one_chan_test, BTN_ID_1, BTN_ID_1_X_LOCATION, BTN_ID_1_Y_LOCATION, BTN_ID_1_X_LOCATION+BTN_ID_1_WIDTH, BTN_ID_1_Y_LOCATION+BTN_ID_1_HEIGHT);
+    UG_ButtonSetStyle(&window_1, BTN_ID_1, BTN_STYLE_2D|BTN_STYLE_USE_ALTERNATE_COLORS|BTN_STYLE_NO_BORDERS);
+    UG_ButtonSetForeColor(&window_1, BTN_ID_1, C_YELLOW);
+    UG_ButtonSetBackColor(&window_1, BTN_ID_1, C_MEDIUM_BLUE);  
+    UG_ButtonSetFont(&window_1, BTN_ID_1, &FONT_8X12);
+    UG_ButtonSetText(&window_1, BTN_ID_1, "TX 1-channel Test"); 
+           
+    /* Create "Many channels TX test" selection button (BTN_ID_2) */
+    UG_ButtonCreate(&window_1, &button_tx_many_chan_test, BTN_ID_2, BTN_ID_2_X_LOCATION, BTN_ID_2_Y_LOCATION, BTN_ID_2_X_LOCATION+BTN_ID_2_WIDTH, BTN_ID_2_Y_LOCATION+BTN_ID_2_HEIGHT);
+    UG_ButtonSetStyle(&window_1, BTN_ID_2, BTN_STYLE_2D|BTN_STYLE_USE_ALTERNATE_COLORS|BTN_STYLE_NO_BORDERS);
+    UG_ButtonSetForeColor(&window_1, BTN_ID_2, C_YELLOW);
+    UG_ButtonSetBackColor(&window_1, BTN_ID_2, C_MEDIUM_BLUE);  
+    UG_ButtonSetFont(&window_1, BTN_ID_2, &FONT_8X12);
+    UG_ButtonSetText(&window_1, BTN_ID_2, "TX n-channel Test"); 
+    
      /* Finally , show the window */
     UG_WindowShow( &window_1 ) ;
 
     for (;;)
-    {
-         //touch_info_t touch;
-
-         //ft6206_return_touch_state(&touch);
-         //UG_TouchUpdate( touch.x, touch.y, touch.touch );
-         //UG_Update();
-
+    {         
         // Will return every timeout, 625 us.
         current_time = dtm_wait();
-#if (GUI == 0)
+
         if (app_uart_get(&rx_byte) != NRF_SUCCESS)
         {
             // Nothing read from the UART.
             continue;
         }
-#endif
+
 
         if (!is_msb_read)
         {
@@ -310,13 +415,13 @@ int main(void)
         // for the duration of the byte transmissions on the UART.
         if (dtm_event_get(&result))
         {
-#if (GUI == 0)
+
             // Report command status on the UART.
             // Transmit MSB of the result.
             while (app_uart_put((result >> 8) & 0xFF));
             // Transmit LSB of the result.
             while (app_uart_put(result & 0xFF));
-#endif
+
         }
     }
 }

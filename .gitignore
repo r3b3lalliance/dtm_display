@@ -33,3 +33,5 @@ RTE/
 *.emSession
 *.jlink
 *.hex
+direct_test_mode/pca10056/blank/ses/flash_placement - modded.xml
+direct_test_mode/pca10056/blank/ses/flash_placement - original.xml
