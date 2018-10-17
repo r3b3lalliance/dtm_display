@@ -127,7 +127,7 @@ static void uart_init(void)
 
     APP_UART_FIFO_INIT(&comm_params,
                        UART_RX_BUF_SIZE,
-                       UART_TX_BUF_SIZE,
+                       0,
                        uart_error_handle,
                        APP_IRQ_PRIORITY_LOWEST,
                        err_code);
@@ -195,13 +195,10 @@ static uint32_t dtm_send_command_to_fifo(dtm_cmd_t cmd, dtm_freq_t freq, uint32_
 
     data1 = data1 + (cmd << 6);
     data2 = (data2 << 2) + payload;
-    //self._debug("1: %s %s %s 2: %s %s %s" % (data1, bin(data1), chr(data1), data2, bin(data2), chr(data2)))
-    //command = chr(data1) + chr(data2)
+    
     command = data1 + data2;
     app_uart_put((uint8_t)((command & 0x000000FF) >>  0));
     app_uart_put((uint8_t)((command & 0x0000FF00) >>  8));
-    app_uart_put((uint8_t)((command & 0x00FF0000) >> 16));
-    app_uart_put((uint8_t)((command & 0xFF000000) >> 24));
 }
 
 void window_1_callback ( UG_MESSAGE* msg )
@@ -415,13 +412,15 @@ int main(void)
         // for the duration of the byte transmissions on the UART.
         if (dtm_event_get(&result))
         {
-
+/*
             // Report command status on the UART.
             // Transmit MSB of the result.
             while (app_uart_put((result >> 8) & 0xFF));
             // Transmit LSB of the result.
             while (app_uart_put(result & 0xFF));
-
+*/
+            if (result != DTM_SUCCESS)
+              APP_ERROR_CHECK(2);
         }
     }
 }

@@ -149,11 +149,11 @@ uint32_t app_uart_init(const app_uart_comm_params_t * p_comm_params,
     // Configure buffer RX buffer.
     err_code = app_fifo_init(&m_rx_fifo, p_buffers->rx_buf, p_buffers->rx_buf_size);
     VERIFY_SUCCESS(err_code);
-
+/*
     // Configure buffer TX buffer.
     err_code = app_fifo_init(&m_tx_fifo, p_buffers->tx_buf, p_buffers->tx_buf_size);
     VERIFY_SUCCESS(err_code);
-
+*/
 /*
     nrf_drv_uart_config_t config = NRF_DRV_UART_DEFAULT_CONFIG;
     config.baudrate = (nrf_uart_baudrate_t)p_comm_params->baud_rate;
@@ -225,7 +225,8 @@ uint32_t app_uart_get(uint8_t * p_byte)
 uint32_t app_uart_put(uint8_t byte)
 {
     uint32_t err_code;
-    err_code = app_fifo_put(&m_tx_fifo, byte);
+    //err_code = app_fifo_put(&m_tx_fifo, byte);
+    err_code = app_fifo_put(&m_rx_fifo, byte);
     if (err_code == NRF_SUCCESS)
     {
         // The new byte has been added to FIFO. It will be picked up from there
@@ -233,7 +234,7 @@ uint32_t app_uart_put(uint8_t byte)
         // But if UART is not transmitting anything at the moment, we must start
         // a new transmission here.
 /*        if (!nrf_drv_uart_tx_in_progress(&app_uart_inst))
-*/
+
         {
             // This operation should be almost always successful, since we've
             // just added a byte to FIFO, but if some bigger delay occurred
@@ -241,10 +242,11 @@ uint32_t app_uart_put(uint8_t byte)
             // that time, FIFO might be empty already.
             if (app_fifo_get(&m_tx_fifo, tx_buffer) == NRF_SUCCESS)
             {
-/*                err_code = nrf_drv_uart_tx(&app_uart_inst, tx_buffer, 1);
-*/
+                err_code = nrf_drv_uart_tx(&app_uart_inst, tx_buffer, 1);
+
             }
         }
+*/
     }
     return err_code;
 }
