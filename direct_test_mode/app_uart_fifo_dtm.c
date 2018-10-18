@@ -192,9 +192,10 @@ uint32_t app_uart_flush(void)
     err_code = app_fifo_flush(&m_rx_fifo);
     VERIFY_SUCCESS(err_code);
 
+/*
     err_code = app_fifo_flush(&m_tx_fifo);
     VERIFY_SUCCESS(err_code);
-
+*/
     return NRF_SUCCESS;
 }
 
