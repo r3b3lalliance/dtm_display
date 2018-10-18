@@ -226,11 +226,18 @@ void window_1_callback ( UG_MESSAGE* msg )
               break ;
             }
             case BTN_ID_1 : {             
-              if (BTN_ID_0_tx) {
-                (void)dtm_send_command_to_fifo(LE_TRANSMITTER_TEST, DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY, DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH, DTM_PKT_PRBS9);                
+              if (BTN_ID_0_tx) { //TX 1-channel test
+                /*startTX()*/
+                (void)dtm_send_command_to_fifo(LE_TEST_SETUP, 0, 0, DTM_PKT_PRBS9);
+                (void)dtm_send_command_to_fifo(LE_TRANSMITTER_TEST, DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY, DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH, DTM_PKT_PRBS9);
+                //(void)dtm_send_command_to_fifo(LE_TEST_END, 0, 0, 0); /*TBD this needs to be after the Rx test ends*/
               }
               else {
-                (void)dtm_send_command_to_fifo(LE_RECEIVER_TEST, DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY, DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH, DTM_PKT_PRBS9);                
+                /*_runRX()*/
+                (void)dtm_send_command_to_fifo(LE_TEST_SETUP, 0, 0, DTM_PKT_PRBS9);
+                (void)dtm_send_command_to_fifo(LE_RECEIVER_TEST, DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY, DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH, DTM_PKT_PRBS9);
+                (void)dtm_send_command_to_fifo(LE_TEST_END, 0, 0, 0);
+                /* receive event after above command will return statistics. */
               }
               break;
             }
