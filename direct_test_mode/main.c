@@ -227,7 +227,7 @@ void window_1_callback ( UG_MESSAGE* msg )
             }
             case BTN_ID_1 : {             
               if (BTN_ID_0_tx) { //TX 1-channel test
-                /*startTX()*/
+                /*startTX()*/ /*see dtm.py and example.py for top level logic */
                 (void)dtm_send_command_to_fifo(LE_TEST_SETUP, 0, 0, DTM_PKT_PRBS9);
                 (void)dtm_send_command_to_fifo(LE_TRANSMITTER_TEST, DTM_SINGLE_CHAN_TEST_DEFAULT_FREQUENCY, DTM_SINGLE_CHAN_TEST_DEFAULT_LENGTH, DTM_PKT_PRBS9);
                 //(void)dtm_send_command_to_fifo(LE_TEST_END, 0, 0, 0); /*TBD this needs to be after the Rx test ends*/
